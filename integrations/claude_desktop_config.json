@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "nexus-mcp": {
+      "command": "python",
+      "args": ["-m", "src.server"],
+      "env": {
+        "NEXUS_MCP_PORT": "8080",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

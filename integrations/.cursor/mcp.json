@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "nexus-mcp-gateway": {
+      "url": "http://localhost:8080/sse",
+      "transport": "sse",
+      "headers": {
+        "User-Agent": "Cursor-IDE/2026",
+        "Accept": "text/event-stream"
+      }
+    }
+  }
+}

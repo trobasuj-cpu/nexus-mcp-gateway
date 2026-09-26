@@ -1,0 +1,4 @@
+# NexusMCP Core Dependencies
+# Zero mandatory external runtime dependencies for standard JSON-RPC HTTP server!
+# Optional development and testing tooling:
+pytest>=8.0.0

@@ -1,0 +1,17 @@
+# Commercial Pro & Distribution Artifacts (Strictly Excluded)
+pro-version/
+distribution/
+open-core/
+
+# Python byte-code & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# OS artifacts
+.DS_Store
+Thumbs.db

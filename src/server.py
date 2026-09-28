@@ -25,6 +25,7 @@ try:
         get_safe_sql_tool_definition, handle_sql_invocation,
         get_cost_router_tool_definition, handle_router_invocation
     )
+    from .dashboard import get_dashboard_html, TELEMETRY
 except (ImportError, ValueError):
     from protocol import (
         JSONRPCRequest,
@@ -38,6 +39,7 @@ except (ImportError, ValueError):
         get_safe_sql_tool_definition, handle_sql_invocation,
         get_cost_router_tool_definition, handle_router_invocation
     )
+    from dashboard import get_dashboard_html, TELEMETRY
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] [NexusMCP] %(message)s")
 logger = logging.getLogger("NexusMCP")
@@ -92,6 +94,15 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_html_response(self, html: str) -> None:
+        body = html.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -100,7 +111,12 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self) -> None:
-        if self.path == "/health":
+        clean_path = self.path.split("?")[0]
+        if clean_path in ("/", "/dashboard", "/index.html"):
+            self._send_html_response(get_dashboard_html())
+        elif clean_path == "/api/stats":
+            self._send_json_response(200, TELEMETRY.get_stats())
+        elif clean_path == "/health":
             uptime_sec = round(time.time() - SERVER_START_TIME, 2)
             self._send_json_response(200, {
                 "status": "HEALTHY",
@@ -108,7 +124,7 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                 "protocol_version": MCP_PROTOCOL_VERSION,
                 "registered_tools_count": len(REGISTRY.list_tools())
             })
-        elif self.path == "/sse":
+        elif clean_path == "/sse":
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Cache-Control", "no-cache")
@@ -118,20 +134,71 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
             event_data = f"event: endpoint\ndata: /mcp\n\n".encode("utf-8")
             self.wfile.write(event_data)
         else:
-            self._send_json_response(404, {"error": "Not Found", "valid_endpoints": ["/mcp", "/health", "/sse"]})
+            self._send_json_response(404, {
+                "error": "Not Found",
+                "valid_endpoints": ["/", "/dashboard", "/api/stats", "/mcp", "/health", "/sse"]
+            })
 
     def do_POST(self) -> None:
+        content_length = int(self.headers.get("Content-Length", 0))
+        raw_body = self.rfile.read(content_length) if content_length > 0 else b""
+
+        # 1. Interactive Simulator: AST Sandbox
+        if self.path == "/api/test/sandbox":
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                code = payload.get("code", "")
+                t0 = time.perf_counter()
+                res = handle_sandbox_invocation({"code": code})
+                elapsed = (time.perf_counter() - t0) * 1000.0
+                status = "BLOCKED" if res.isError else "ALLOWED"
+                reason = res.content[0]["text"] if res.isError else "AST security verification passed"
+                TELEMETRY.record_event("execute_python_sandbox", "AST_SIMULATION", status, code, reason, elapsed)
+                self._send_json_response(200, res.to_dict())
+            except Exception as e:
+                self._send_json_response(400, {"error": str(e)})
+            return
+
+        # 2. Interactive Simulator: Safe SQL
+        if self.path == "/api/test/sql":
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                query = payload.get("query", "")
+                t0 = time.perf_counter()
+                res = handle_sql_invocation({"query": query})
+                elapsed = (time.perf_counter() - t0) * 1000.0
+                status = "BLOCKED" if res.isError else "ALLOWED"
+                reason = res.content[0]["text"] if res.isError else "Query executed safely"
+                TELEMETRY.record_event("safe_sql_query", "SQL_SIMULATION", status, query, reason, elapsed)
+                self._send_json_response(200, res.to_dict())
+            except Exception as e:
+                self._send_json_response(400, {"error": str(e)})
+            return
+
+        # 3. Interactive Simulator: Cost Router
+        if self.path == "/api/test/route":
+            try:
+                payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+                t0 = time.perf_counter()
+                res = handle_router_invocation(payload)
+                elapsed = (time.perf_counter() - t0) * 1000.0
+                desc = payload.get("task_description", "")
+                TELEMETRY.record_event("calculate_model_route", "COST_OPTIMIZATION", "ROUTED", desc, "Cost router calculated optimal model tier", elapsed)
+                self._send_json_response(200, res.to_dict())
+            except Exception as e:
+                self._send_json_response(400, {"error": str(e)})
+            return
+
+        # 4. Standard MCP 2026 Wire Protocol
         if self.path != "/mcp":
             self._send_json_response(404, {"error": "Invalid endpoint. Send MCP requests to /mcp"})
             return
 
-        content_length = int(self.headers.get("Content-Length", 0))
         if content_length <= 0:
             resp = JSONRPCResponse.create_error(None, MCPErrorCode.PARSE_ERROR, "Empty request body")
             self._send_json_response(400, resp.to_dict())
             return
 
-        raw_body = self.rfile.read(content_length)
         try:
             req = JSONRPCRequest.parse_raw(raw_body)
         except Exception as parse_err:
@@ -139,7 +206,6 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
             self._send_json_response(400, resp.to_dict())
             return
 
-        # Route standard MCP methods
         try:
             if req.method == "initialize":
                 res_data = {
@@ -157,7 +223,12 @@ class MCPRequestHandler(BaseHTTPRequestHandler):
                 if not tool_name:
                     out = JSONRPCResponse.create_error(req.id, MCPErrorCode.INVALID_PARAMS, "Missing 'name' in tools/call")
                 else:
+                    t0 = time.perf_counter()
                     exec_result = REGISTRY.invoke(tool_name, arguments)
+                    elapsed = (time.perf_counter() - t0) * 1000.0
+                    status = "BLOCKED" if exec_result.isError else "ALLOWED"
+                    preview = str(arguments)[:80]
+                    TELEMETRY.record_event(tool_name, "MCP_WIRE_CALL", status, preview, "MCP agent invocation", elapsed)
                     out = JSONRPCResponse.create_result(req.id, exec_result.to_dict())
             elif req.method == "ping":
                 out = JSONRPCResponse.create_result(req.id, {})

@@ -3,11 +3,21 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python: 3.10+](https://img.shields.io/badge/Python-3.10%2B-brightgreen.svg)](https://python.org)
 [![MCP Protocol: 2026 Compliant](https://img.shields.io/badge/MCP_Protocol-2026_Compliant-purple.svg)](https://modelcontextprotocol.io)
-[![Tests: 23 Passed Deterministic](https://img.shields.io/badge/Tests-23_Passed_(100%25)-emerald.svg)](run_tests.py)
+[![Tests: 28 Passed Deterministic](https://img.shields.io/badge/Tests-28_Passed_(100%25)-emerald.svg)](run_tests.py)
+[![Web Dashboard: Built-in](https://img.shields.io/badge/Web_Dashboard-Built--in_Dark_SOC-cyan.svg)](http://localhost:8080)
 [![Docker: Hardened Non-Root](https://img.shields.io/badge/Docker-Hardened_Non--Root-cyan.svg)](Dockerfile)
 
 > **Stop letting autonomous coding agents execute dangerous commands on your production infrastructure.**  
 > NexusMCP is a production-grade, stateless Model Context Protocol (MCP) gateway that provides isolated AST code sandboxing, safe SQL circuit-breakers, and semantic token routing for **Cursor, Windsurf, Claude Desktop, and autonomous LLM agents**.
+
+---
+
+## 🖥️ Built-in Dark Cyber Web Dashboard
+
+NexusMCP includes an out-of-the-box, zero-dependency **Security Operations Center (SOC) Web Dashboard** served directly on `http://localhost:8080/`:
+* **Live Threat Intercept Ledger**: Real-time telemetry monitoring blocked `DROP TABLE` queries, forbidden shell escapes, and unauthorized attribute visits.
+* **Token Cost Savings Analytics**: Live tracking of token costs saved by routing routine tasks to **DeepSeek V4.1-Flash** ($0.20/M) vs frontier models (**Claude 5 Fable** at $12/M / **GPT-6 Astra** at $10/M).
+* **Interactive Threat Simulator**: Test the AST Sandbox, Safe SQL Engine, and Cost Router directly in the browser with 1-click attack presets.
 
 ---
 
@@ -29,7 +39,7 @@ Autonomous agents like Claude 5 Fable, GPT-6 Astra, and Cursor are incredibly po
                    │
                    ▼ (Stateless JSON-RPC 2.0 / SSE)
         ┌───────────────────────────────────┐
-        │       NexusMCP Gateway (:8080)     │
+        │       NexusMCP Gateway (:8080)     │ ──► [ Web Dashboard / SOC ]
         └─────────────────┬─────────────────┘
                           │
           ┌───────────────┼───────────────┐
@@ -46,26 +56,27 @@ Autonomous agents like Claude 5 Fable, GPT-6 Astra, and Cursor are incredibly po
 
 | Tool Name | Wire Identifier | Security Safeguards | Latency |
 | :--- | :--- | :--- | :--- |
-| **AST Code Sandbox** | `execute_python_sandbox` | AST node visitor, bans sockets/subprocess/eval/exec, CPU timeout watchdog. | ~1.1 ms |
-| **Safe SQL Engine** | `safe_sql_query` | Intercepts `DROP`/`TRUNCATE`/unbounded mutations, enforce read-only transactions. | ~1.5 ms |
-| **Model Cost Router** | `calculate_model_route` | Semantic task arbitrator dispatching between DeepSeek V4.1-Flash and Claude 5. | ~0.1 ms |
+| **AST Code Sandbox** | `execute_python_sandbox` | AST node visitor, bans sockets/subprocess/eval/exec, CPU timeout watchdog. | ~0.2 ms |
+| **Safe SQL Engine** | `safe_sql_query` | Intercepts `DROP`/`TRUNCATE`/unbounded mutations, enforce read-only transactions. | ~0.05 ms |
+| **Model Cost Router** | `calculate_model_route` | Semantic task arbitrator dispatching between DeepSeek V4.1-Flash and Claude 5. | ~0.01 ms |
 
 ---
 
 ## 🚀 10-Second Quickstart
 
-### Option A: 1-Click Docker Compose
+### Option A: Pure Python (Zero External Dependencies)
 ```bash
-git clone https://github.com/trobasuj-cpu/free-ai-saas-landing-page.git # or nexus-mcp
-cd open-core
+python -m src.server
+```
+Visit **`http://localhost:8080/`** to view the live Cyber Web Dashboard!
+
+### Option B: 1-Click Docker Compose
+```bash
+git clone https://github.com/trobasuj-cpu/nexus-mcp-gateway.git
+cd nexus-mcp-gateway
 docker compose up -d
 ```
-The server will start on `http://localhost:8080/mcp` with health checks on `http://localhost:8080/health`.
-
-### Option B: Pure Python (Zero External Dependencies)
-```bash
-python src/server.py
-```
+The server starts on `http://localhost:8080` with the Web Dashboard on `/`, MCP on `/mcp`, and health checks on `/health`.
 
 ### Run Deterministic Verification Harness
 ```bash
@@ -73,7 +84,7 @@ python run_tests.py
 # Or with pytest:
 pytest tests/ -v
 ```
-*(Runs 23 comprehensive security tests in <10ms).*
+*(Runs 28 comprehensive security and live HTTP tests in <500ms).*
 
 ---
 

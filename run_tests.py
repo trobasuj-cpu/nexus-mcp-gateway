@@ -19,6 +19,8 @@ sys.path.insert(0, str(TESTS_DIR))
 import test_ast_sandbox
 import test_safe_sql
 import test_mcp_protocol
+import test_dashboard
+import test_server_live
 
 
 def run_all() -> bool:
@@ -30,7 +32,9 @@ def run_all() -> bool:
     test_modules = [
         ("AST Sandbox Security", test_ast_sandbox),
         ("Safe SQL Engine", test_safe_sql),
-        ("MCP Protocol 2026", test_mcp_protocol)
+        ("MCP Protocol 2026", test_mcp_protocol),
+        ("Web Dashboard & Telemetry", test_dashboard),
+        ("Live HTTP Daemon & Simulator", test_server_live)
     ]
 
     total_passed = 0
